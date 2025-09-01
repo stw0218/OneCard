@@ -22,6 +22,17 @@ COneCardDlg::COneCardDlg(CWnd* pParent /*=nullptr*/)
 	: CDialogEx(IDD_ONECARD_DIALOG, pParent)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
+    m_nHighlightedCardIndex = -1;
+}
+
+COneCardDlg::~COneCardDlg()
+{
+    // m_cardImages 배열에 저장된 모든 CImage* 포인터를 순회하며 메모리를 해제합니다.
+    for (int i = 0; i < m_cardImages.GetSize(); i++)
+    {
+        delete m_cardImages[i];
+    }
+    m_cardImages.RemoveAll();
 }
 
 void COneCardDlg::DoDataExchange(CDataExchange* pDX)
@@ -38,6 +49,7 @@ BEGIN_MESSAGE_MAP(COneCardDlg, CDialogEx)
     ON_WM_LBUTTONDOWN()
     ON_WM_TIMER()
     ON_WM_ERASEBKGND()
+    ON_WM_MOUSEMOVE()
 END_MESSAGE_MAP()
 
 
@@ -45,11 +57,105 @@ END_MESSAGE_MAP()
 
 BOOL COneCardDlg::OnInitDialog()
 {
-	CDialogEx::OnInitDialog();
+    CDialogEx::OnInitDialog();
+
+    // --- ★★★ 이미지 프리로딩(Pre-loading) 시작 ★★★ ---
+
+    // 1. 로드할 모든 리소스 ID를 준비합니다.
+    int resourceIDs[4][13] = {
+        {IDB_CLUB_ACE, IDB_CLUB_2, IDB_CLUB_3, IDB_CLUB_4, IDB_CLUB_5, IDB_CLUB_6,
+        IDB_CLUB_7, IDB_CLUB_8, IDB_CLUB_9, IDB_CLUB_10, IDB_CLUB_JACK, IDB_CLUB_QUEEN, IDB_CLUB_KING},
+        {IDB_DIAMOND_ACE, IDB_DIAMOND_2, IDB_DIAMOND_3, IDB_DIAMOND_4, IDB_DIAMOND_5, IDB_DIAMOND_6,
+        IDB_DIAMOND_7, IDB_DIAMOND_8, IDB_DIAMOND_9, IDB_DIAMOND_10, IDB_DIAMOND_JACK, IDB_DIAMOND_QUEEN, IDB_DIAMOND_KING},
+        {IDB_HEART_ACE, IDB_HEART_2, IDB_HEART_3, IDB_HEART_4, IDB_HEART_5, IDB_HEART_6,
+        IDB_HEART_7, IDB_HEART_8, IDB_HEART_9, IDB_HEART_10, IDB_HEART_JACK, IDB_HEART_QUEEN, IDB_HEART_KING},
+        {IDB_SPADE_ACE, IDB_SPADE_2, IDB_SPADE_3, IDB_SPADE_4, IDB_SPADE_5, IDB_SPADE_6,
+        IDB_SPADE_7, IDB_SPADE_8, IDB_SPADE_9, IDB_SPADE_10, IDB_SPADE_JACK, IDB_SPADE_QUEEN, IDB_SPADE_KING},
+    };
+    int jokerIDs[] = { IDB_JOKER_BLACK, IDB_JOKER_RED };
+    int backID = IDB_CARD_BACK;
+
+    // 2. 이미지 저장소를 깨끗하게 비웁니다.
+    m_cardImages.RemoveAll();
+    m_mapCardIDtoIndex.RemoveAll();
+
+    // 3. 이미지 로딩을 위한 람다 함수 정의 (오류 수정 및 간결화)
+    auto LoadCardImage = [&](int resourceID) {
+        CImage* pImage = new CImage();
+
+        HRSRC hRes = ::FindResource(AfxGetInstanceHandle(), MAKEINTRESOURCE(resourceID), _T("PNG"));
+        if (hRes == NULL) {
+            TRACE(L"!!! LoadCardImage failed: FindResource for ID %d (PNG) returned NULL. !!!\n", resourceID);
+            return;
+        }
+
+        DWORD len = ::SizeofResource(AfxGetInstanceHandle(), hRes);
+        HGLOBAL hResData = ::LoadResource(AfxGetInstanceHandle(), hRes);
+        if (hResData == NULL) {
+            TRACE(L"!!! LoadCardImage failed: LoadResource for ID %d returned NULL. !!!\n", resourceID);
+            return;
+        }
+
+        void* pResData = ::LockResource(hResData);
+        if (pResData == NULL) {
+            TRACE(L"!!! LoadCardImage failed: LockResource for ID %d returned NULL. !!!\n", resourceID);
+            return;
+        }
+
+        HGLOBAL hGlobal = ::GlobalAlloc(GMEM_MOVEABLE, len);
+        if (hGlobal == NULL) {
+            TRACE(L"!!! LoadCardImage failed: GlobalAlloc for ID %d returned NULL. !!!\n", resourceID);
+            return;
+        }
+
+        void* pBuffer = ::GlobalLock(hGlobal);
+        if (pBuffer == NULL) {
+            ::GlobalFree(hGlobal); // 할당한 hGlobal 해제
+            TRACE(L"!!! LoadCardImage failed: GlobalLock for ID %d returned NULL. !!!\n", resourceID);
+            return;
+        }
+
+        memcpy(pBuffer, pResData, len);
+        ::GlobalUnlock(hGlobal);
+
+        IStream* pStream = NULL;
+        if (SUCCEEDED(::CreateStreamOnHGlobal(hGlobal, TRUE, &pStream)))
+        {
+            if (SUCCEEDED(pImage->Load(pStream))) // pImage->Load()
+            {
+                // ★ 로드 성공 시: CImage 포인터를 배열에 추가
+                INT_PTR nIndex = m_cardImages.Add(pImage);
+                m_mapCardIDtoIndex.SetAt(resourceID, (int)nIndex);
+            }
+            else
+            {
+                delete pImage; // 로드 실패 시 할당한 메모리 즉시 해제
+                TRACE(L"!!! LoadCardImage failed: CImage::Load for ID %d failed. !!!\n", resourceID);
+            }
+            pStream->Release();
+        }
+        else
+        {
+            delete pImage; // 스트림 생성 실패 시에도 메모리 해제
+            ::GlobalFree(hGlobal);
+            TRACE(L"!!! LoadCardImage failed: CreateStreamOnHGlobal for ID %d failed. !!!\n", resourceID);
+        }
+        };
+
+    // 4. 정의된 람다 함수를 이용해 모든 카드를 로드합니다.
+    for (int i = 0; i < 4; ++i)
+        for (int j = 0; j < 13; ++j)
+            LoadCardImage(resourceIDs[i][j]);
+
+    LoadCardImage(jokerIDs[0]);
+    LoadCardImage(jokerIDs[1]);
+    LoadCardImage(backID);
+
+    // --- 이미지 프리로딩(Pre-loading) 끝 ---
 
     m_game.StartGame();
 
-	return TRUE;
+    return TRUE;
 }
 
 void COneCardDlg::OnPaint()
@@ -115,6 +221,19 @@ void COneCardDlg::OnPaint()
             CRect cardRect(0, 0, m_cardSize.cx, m_cardSize.cy);
             cardRect.OffsetRect(startX + i * overlap, rect.Height() - m_cardSize.cy - margin);
             DrawCard(&memDC, myCards[i].resourceID, cardRect);
+            if (i == m_nHighlightedCardIndex)
+            {
+                // 노란색 테두리를 그려서 강조합니다.
+                CBrush* pOldBrush = (CBrush*)memDC.SelectStockObject(NULL_BRUSH); // 채우기 없음
+                CPen newPen(PS_SOLID, 3, RGB(255, 255, 0)); // 3픽셀 두께의 노란색 펜
+                CPen* pOldPen = memDC.SelectObject(&newPen);
+
+                memDC.Rectangle(cardRect); // 카드 영역에 사각형 테두리를 그림
+
+                // 원래 펜과 브러시로 복원
+                memDC.SelectObject(pOldPen);
+                memDC.SelectObject(pOldBrush);
+            }
         }
     }
 
@@ -133,73 +252,35 @@ void COneCardDlg::OnPaint()
 
 void COneCardDlg::DrawCard(CDC* pDC, int resourceID, CRect destRect)
 {
-    CImage image;
-    bool bLoaded = false; // 로드 성공 여부를 추적할 플래그
-
-    // Win32 API를 사용하여 "PNG" 타입의 리소스를 직접 찾습니다.
-    HRSRC hRes = ::FindResource(AfxGetInstanceHandle(), MAKEINTRESOURCE(resourceID), _T("PNG"));
-    if (hRes != NULL)
+    int nIndex = -1;
+    // 1. 맵에서 리소스 ID에 해당하는 이미지 인덱스를 찾습니다.
+    if (m_mapCardIDtoIndex.Lookup(resourceID, nIndex))
     {
-        DWORD len = ::SizeofResource(AfxGetInstanceHandle(), hRes);
-        HGLOBAL hResData = ::LoadResource(AfxGetInstanceHandle(), hRes);
-        if (hResData != NULL)
+        if (nIndex >= 0 && nIndex < m_cardImages.GetSize() && !m_cardImages[nIndex]->IsNull())
         {
-            // 리소스 데이터에 대한 포인터를 얻습니다.
-            void* pResData = ::LockResource(hResData);
-            if (pResData != NULL)
-            {
-                // --- 핵심 수정 부분 ---
-                // 1. CreateStreamOnHGlobal이 사용할 수 있는 새로운 HGLOBAL 메모리를 할당합니다.
-                HGLOBAL hGlobal = ::GlobalAlloc(GMEM_MOVEABLE, len);
-                if (hGlobal != NULL)
-                {
-                    // 2. 쓰기 가능한 메모리 포인터를 얻습니다.
-                    void* pBuffer = ::GlobalLock(hGlobal);
-                    if (pBuffer != NULL)
-                    {
-                        // 3. 리소스 데이터를 새로 할당한 메모리에 복사합니다.
-                        memcpy(pBuffer, pResData, len);
-                        ::GlobalUnlock(hGlobal);
-
-                        // 4. 이제 안전하게 스트림을 생성할 수 있습니다.
-                        IStream* pStream = NULL;
-                        // fDeleteOnRelease를 TRUE로 설정하여 스트림이 닫힐 때 hGlobal 메모리가 자동으로 해제되게 합니다.
-                        if (SUCCEEDED(::CreateStreamOnHGlobal(hGlobal, TRUE, &pStream)))
-                        {
-                            if (SUCCEEDED(image.Load(pStream)))
-                            {
-                                bLoaded = true; // 최종 로드 성공!
-                            }
-                            pStream->Release();
-                        }
-                    }
-
-                    // 만약 스트림 생성/로드 실패 시, 우리가 직접 할당한 메모리를 해제해야 합니다.
-                    if (!bLoaded)
-                    {
-                        ::GlobalFree(hGlobal);
-                    }
-                }
-                // --- 핵심 수정 끝 ---
-            }
+            // 2. 해당 인덱스의 CImage 객체를 가져와 그립니다. (매우 빠름)
+            m_cardImages[nIndex]->Draw(pDC->GetSafeHdc(), destRect);
         }
-    }
+        else
+        {
+            // 이미지가 유효하지 않은 경우
+            CString str;
+            str.Format(_T("!!! DrawCard ERROR: Image at index %d (resourceID %d) is invalid or null. !!!"), nIndex, resourceID);
+            TRACE(str);
 
-    // 최종적으로 로드 성공 여부를 확인하고 이미지를 그립니다.
-    if (bLoaded && !image.IsNull())
-    {
-        image.Draw(pDC->GetSafeHdc(), destRect);
+            pDC->Rectangle(destRect);
+            pDC->TextOut(destRect.left + 10, destRect.top + 10, L"ERR");
+        }
     }
     else
     {
-        // 로드 실패 시 디버그 '출력' 창에 메시지를 표시합니다.
+        // 맵에 없는 경우 (오류)
         CString str;
-        str.Format(_T("!!! 리소스 ID %d, 타입 'PNG' 로드 최종 실패 !!!"), resourceID);
+        str.Format(_T("!!! DrawCard ERROR: resourceID %d not found in map. !!!"), resourceID);
         TRACE(str);
 
-        // (선택) 실패했음을 화면에 표시
         pDC->Rectangle(destRect);
-        pDC->TextOut(destRect.left + 30, destRect.top + 40, L"X");
+        pDC->TextOut(destRect.left + 10, destRect.top + 10, L"N/A");
     }
 }
 
@@ -405,4 +486,23 @@ BOOL COneCardDlg::OnEraseBkgnd(CDC* pDC)
 {
     //return CDialogEx::OnEraseBkgnd(pDC);
     return TRUE;
+}
+
+void COneCardDlg::OnMouseMove(UINT nFlags, CPoint point)
+{
+    // 1. 현재 마우스 위치에 있는 카드의 인덱스를 찾습니다.
+    //    GetClickedCardIndex 함수를 재활용합니다.
+    int nNewIndex = GetClickedCardIndex(point);
+
+    // 2. 이전에 강조했던 카드와 현재 카드가 다를 경우에만 갱신합니다. (성능 최적화)
+    if (nNewIndex != m_nHighlightedCardIndex)
+    {
+        // 3. 강조할 카드의 인덱스를 업데이트합니다.
+        m_nHighlightedCardIndex = nNewIndex;
+
+        // 4. 화면을 다시 그리도록 요청합니다.
+        Invalidate(FALSE); // TRUE로 하면 배경을 지우므로 깜빡일 수 있음
+    }
+
+    CDialogEx::OnMouseMove(nFlags, point);
 }
