@@ -5,7 +5,7 @@
 #pragma once
 #include "GameLogic.h"
 
-#define DELAY_COM_TURN 1000 // 컴퓨터 턴 지연 시간 (밀리초)
+#define DELAY_COM_TURN 100 // 컴퓨터 턴 지연 시간 (밀리초)
 #define OVERLAP_CARD_RATIO 0.20 // 카드 간격 비율
 
 #define TIMER_COM_TURN 1
@@ -29,7 +29,7 @@ public:
 private:
 	void DrawCard(CDC* pDC, int resourceID, CRect destRect);
 	int GetClickedCardIndex(CPoint point); // 클릭된 카드의 인덱스를 찾는 함수
-	void ProcessGameStatus(GameStatus status);
+	void ProcessGameStatus(TurnResult status);
 
 	CGameLogic m_game;
 	// UI 레이아웃 관리를 위한 멤버 변수

@@ -2,6 +2,7 @@
 #pragma once
 #include <vector>
 #include <string>
+#include <optional>
 
 enum class CardSuit
 {
@@ -9,14 +10,18 @@ enum class CardSuit
 	CLUB = 0,
 	DIAMOND,
 	HEART,
-	SPADE
+	SPADE,
+	JOKER_BLACK,
+	JOKER_RED,
 };
 
-enum class GameStatus {
-    PLAYING,
-    PLAYER_WIN,
-    PLAYER_LOSE
-};  
+enum class TurnResult {
+    SUCCESS,                // 일반적인 턴 성공
+    INVALID_PLAY,           // 낼 수 없는 카드를 냄
+    REQUIRE_SUIT_CHOICE,    // 7을 내서 모양을 선택해야 함
+    GAME_OVER_WIN,
+    GAME_OVER_LOSE
+};
 
 struct Card
 {
@@ -36,9 +41,11 @@ public:
 
     // --- 게임 진행 함수 ---
     void StartGame();   // 게임 시작 (카드 덱 생성, 셔플, 분배)
-    GameStatus PlayCard(int playerCardIndex); // 플레이어가 카드를 냄
-    GameStatus DrawCard();    // 플레이어가 덱에서 카드를 뽑음
-    GameStatus ComTurn();     // 컴퓨터의 턴을 진행
+    TurnResult PlayCard(int playerCardIndex); // 플레이어가 카드를 냄
+    TurnResult DrawCard();
+    TurnResult ComTurn();     // 컴퓨터의 턴을 진행
+    void SetForcedSuit(CardSuit suit);      // 7 카드를 낸 후, Dlg가 선택한 모양을 설정하는 함수
+    int GetAttackStack() const;     // Dlg가 현재 공격 스택을 화면에 표시할 수 있도록 값을 알려주는 함수
 
     // --- 게임 상태 정보 함수 ---
     const std::vector<Card>& GetPlayerHand() const; // 플레이어의 카드 목록을 반환
@@ -47,11 +54,15 @@ public:
     bool IsPlayerTurn() const; // 현재 플레이어 턴인지 확인하는 함수
 
 private:
-    GameStatus CheckGameOver(); // 게임 종료 조건을 확인하는 내부 함수
+    TurnResult CheckGameOver();
+    void ReshuffleDeck();
 
     std::vector<Card> m_deck;         // 전체 카드 덱
     std::vector<Card> m_playerHand;   // 플레이어의 패
     std::vector<Card> m_comHand;      // 컴퓨터의 패
     std::vector<Card> m_openPile;     // 공개된 카드 더미
     bool m_isPlayerTurn; // 현재 플레이어의 턴인지 여부
+    int m_attackStack;                     // 누적된 공격 카드 수
+    std::optional<CardSuit> m_forcedSuit;  // 7로 인해 강제된 카드 모양 (optional: 값이 없을 수도 있음)
+    std::optional<Card> m_attackCard;
 };

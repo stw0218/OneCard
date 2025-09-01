@@ -7,6 +7,7 @@
 #include "OneCard.h"
 #include "OneCardDlg.h"
 #include "afxdialogex.h"
+//#include "SuitChoiceDlg.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -263,34 +264,43 @@ void COneCardDlg::OnLButtonDown(UINT nFlags, CPoint point)
         return;
     }
 
-    GameStatus status = GameStatus::PLAYING; // 턴의 결과를 저장할 변수
-
-    // 2. 플레이어의 카드를 클릭했는지 먼저 확인
+    TurnResult result = TurnResult::INVALID_PLAY;
+    // ... (덱 클릭 또는 카드 클릭 로직) ...
     int clickedCardIndex = GetClickedCardIndex(point);
     if (clickedCardIndex != -1)
     {
-        // 2-1. 카드를 클릭했다면, 카드 내는 로직 실행
-        status = m_game.PlayCard(clickedCardIndex);
+        result = m_game.PlayCard(clickedCardIndex);
     }
-    // 3. 카드를 클릭하지 않았다면, 덱을 클릭했는지 확인
     else if (m_deckRect.PtInRect(point))
     {
-        // 3-1. 덱을 클릭했다면, 카드 뽑는 로직 실행
-        status = m_game.DrawCard();
+        result = m_game.DrawCard();
     }
 
-    // 4. 어떤 행동이라도 했다면 (상태가 바뀌었다면) 화면 갱신 및 후속 처리
-    if (status != GameStatus::PLAYING || clickedCardIndex != -1 || m_deckRect.PtInRect(point))
+    // 턴 결과에 따른 후속 처리
+    if (result != TurnResult::INVALID_PLAY)
     {
-        Invalidate(); // 화면을 다시 그림
+        Invalidate(); // 일단 화면 갱신
 
-        // 게임 오버 상태인지 확인하고 처리
-        ProcessGameStatus(status);
-
-        // 게임이 계속되고, 턴이 컴퓨터에게 넘어갔다면 컴퓨터 턴 타이머 설정
-        if (status != GameStatus::PLAYER_WIN && status != GameStatus::PLAYER_LOSE && !m_game.IsPlayerTurn())
+        if (result == TurnResult::REQUIRE_SUIT_CHOICE)
         {
-            SetTimer(TIMER_COM_TURN, 1000, NULL);
+            // 모양 선택 창 띄우기
+            //CSuitChoiceDlg dlg;
+            //if (dlg.DoModal() == IDOK)
+            //{
+            //    m_game.SetForcedSuit(dlg.GetSelectedSuit());
+            //    SetTimer(TIMER_COM_TURN, DELAY_COM_TURN, NULL); // 컴퓨터 턴 시작
+            //}
+            m_game.SetForcedSuit(CardSuit::SPADE);
+            SetTimer(TIMER_COM_TURN, DELAY_COM_TURN, NULL); // 컴퓨터 턴 시작
+        }
+        else if (result == TurnResult::GAME_OVER_WIN || result == TurnResult::GAME_OVER_LOSE)
+        {
+            ProcessGameStatus(result); // 게임 오버 처리
+        }
+        else if (!m_game.IsPlayerTurn())
+        {
+            // 일반적인 턴 종료 시 컴퓨터 턴 시작
+            SetTimer(TIMER_COM_TURN, DELAY_COM_TURN, NULL);
         }
     }
 
@@ -314,22 +324,22 @@ void COneCardDlg::OnTimer(UINT_PTR nIDEvent)
     CDialogEx::OnTimer(nIDEvent);
 }
 
-void COneCardDlg::ProcessGameStatus(GameStatus status)
+void COneCardDlg::ProcessGameStatus(TurnResult status)
 {
     CString message;
     bool bGameOver = false;
 
     switch (status)
     {
-    case GameStatus::PLAYER_WIN:
-        message = _T("승리했습니다! 새 게임을 시작합니다.");
+    case TurnResult::GAME_OVER_WIN:
+        message = _T("You Win!");
         bGameOver = true;
         break;
-    case GameStatus::PLAYER_LOSE:
-        message = _T("패배했습니다. 새 게임을 시작합니다.");
+    case TurnResult::GAME_OVER_LOSE:
+        message = _T("You Lose.");
         bGameOver = true;
         break;
-    case GameStatus::PLAYING:
+    case TurnResult::SUCCESS:
         // 게임이 진행 중이면 아무것도 하지 않음
         break;
     }
