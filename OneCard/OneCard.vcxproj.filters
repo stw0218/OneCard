@@ -14,7 +14,7 @@
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
     <Filter Include="리소스 파일\cards">
-      <UniqueIdentifier>{3098066e-c8d6-4a69-a510-d70d327168f8}</UniqueIdentifier>
+      <UniqueIdentifier>{f20b5362-9613-46ac-8fce-670bbb584c51}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -36,6 +36,9 @@
     <ClInclude Include="pch.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="GameLogic.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="OneCard.cpp">
@@ -45,6 +48,9 @@
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="pch.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="GameLogic.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
@@ -183,6 +189,9 @@
       <Filter>리소스 파일\cards</Filter>
     </Image>
     <Image Include="res\cards\ace_of_spades2.png">
+      <Filter>리소스 파일\cards</Filter>
+    </Image>
+    <Image Include="res\cards\back_of_cards.png">
       <Filter>리소스 파일\cards</Filter>
     </Image>
     <Image Include="res\cards\black_joker.png">

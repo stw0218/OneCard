@@ -3,6 +3,7 @@
 //
 
 #pragma once
+#include "GameLogic.h"
 
 
 // COneCardDlg 대화 상자
@@ -20,8 +21,14 @@ public:
 	protected:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV 지원입니다.
 
-
-// 구현입니다.
+private:
+	CGameLogic m_game;
+	// UI 레이아웃 관리를 위한 멤버 변수
+	CSize m_cardSize; // 계산된 카드의 크기 (폭, 높이)
+	CRect m_deckRect; // 덱의 위치와 크기
+	CRect m_openCardRect; // 공개된 카드의 위치와 크기
+	CArray<CRect> m_comCardRects; // 상대방 카드들의 위치와 크기 배열
+	CArray<CRect> m_playerCardRects; // 내 카드들의 위치와 크기 배열
 protected:
 	HICON m_hIcon;
 
@@ -34,5 +41,6 @@ public:
 	afx_msg void OnBnClickedOk();
 	afx_msg void OnBnClickedCancel();
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
-	void DrawCard(CDC* pDC, int bitmapID, CPoint pos);
+	void DrawCard(CDC* pDC, int resourceID, CRect destRect);
+	afx_msg void OnSize(UINT nType, int cx, int cy);
 };
