@@ -40,9 +40,9 @@ public:
     ~CGameLogic();
 
     // --- 게임 진행 함수 ---
-    void StartGame();   // 게임 시작 (카드 덱 생성, 셔플, 분배)
+    virtual void StartGame();   // 게임 시작 (카드 덱 생성, 셔플, 분배)
     TurnResult PlayCard(int playerCardIndex); // 플레이어가 카드를 냄
-    TurnResult DrawCard();
+    virtual TurnResult DrawCard();
     TurnResult ComTurn();     // 컴퓨터의 턴을 진행
     void SetForcedSuit(CardSuit suit);      // 7 카드를 낸 후, Dlg가 선택한 모양을 설정하는 함수
     int GetAttackStack() const;     // Dlg가 현재 공격 스택을 화면에 표시할 수 있도록 값을 알려주는 함수
@@ -53,7 +53,7 @@ public:
     Card GetOpenCard() const;                // 공개된 카드(맨 위)를 반환
     bool IsPlayerTurn() const; // 현재 플레이어 턴인지 확인하는 함수
 
-private:
+protected:
     TurnResult CheckGameOver();
     void ReshuffleDeck();
 

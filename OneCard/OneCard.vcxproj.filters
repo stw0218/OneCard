@@ -39,6 +39,9 @@
     <ClInclude Include="GameLogic.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="Cheat.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="OneCard.cpp">
@@ -51,6 +54,9 @@
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="GameLogic.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="Cheat.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>

@@ -4,12 +4,13 @@
 
 #pragma once
 #include "GameLogic.h"
+#include "Cheat.h"
 #include <afxcoll.h>
 
-#define DELAY_COM_TURN 100 // 컴퓨터 턴 지연 시간 (밀리초)
-#define OVERLAP_CARD_RATIO 0.20 // 카드 간격 비율
+constexpr int DELAY_COM_TURN = 100; // 컴퓨터 턴 지연 시간 (밀리초)
+constexpr double OVERLAP_CARD_RATIO = 0.20; // 카드 간격 비율
 
-#define TIMER_COM_TURN 1
+constexpr int TIMER_COM_TURN = 1;
 
 
 // COneCardDlg 대화 상자
@@ -33,7 +34,7 @@ private:
 	int GetClickedCardIndex(CPoint point); // 클릭된 카드의 인덱스를 찾는 함수
 	void ProcessGameStatus(TurnResult status);
 
-	CGameLogic m_game;
+	CCheat m_game;
 	int m_nHighlightedCardIndex; // 마우스가 올라간 카드의 인덱스 (-1: 없음)
 	CArray<CImage*> m_cardImages; // 모든 CImage 객체를 실제로 저장하는 배열
 	CMap<int, int, int, int> m_mapCardIDtoIndex; // 리소스 ID를 m_cardImages 배열의 인덱스로 변환해주는 맵

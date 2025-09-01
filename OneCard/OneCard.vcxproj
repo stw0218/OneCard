@@ -191,6 +191,7 @@
     </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="Cheat.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="OneCard.h" />
     <ClInclude Include="OneCardDlg.h" />
@@ -200,6 +201,7 @@
     <ClInclude Include="GameLogic.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Cheat.cpp" />
     <ClCompile Include="OneCard.cpp" />
     <ClCompile Include="OneCardDlg.cpp" />
     <ClCompile Include="pch.cpp">
