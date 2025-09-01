@@ -70,38 +70,37 @@ void CGameLogic::StartGame()
 	m_isPlayerTurn = true;
 }
 
-bool CGameLogic::PlayCard(int playerCardIndex)
+GameStatus CGameLogic::PlayCard(int playerCardIndex)
 {
-	// 1. 인덱스 유효성 검사
 	if (playerCardIndex < 0 || playerCardIndex >= m_playerHand.size())
-		return false;
+		return GameStatus::PLAYING; // 잘못된 인덱스는 무시
+
 	const Card& playedCard = m_playerHand[playerCardIndex];
 	const Card& topCard = m_openPile.back();
-	// 2. 카드가 유효한지 검사 (같은 무늬 또는 같은 숫자)
+
 	if (playedCard.suit == topCard.suit || playedCard.rank == topCard.rank)
 	{
-		// 3. 카드 플레이
 		m_openPile.push_back(playedCard);
 		m_playerHand.erase(m_playerHand.begin() + playerCardIndex);
-		m_isPlayerTurn = false; // 턴 종료
-		return true;
+		m_isPlayerTurn = false;
+		return CheckGameOver(); // 게임 상태를 확인하고 반환
 	}
-	return false; // 유효하지 않은 카드
+	return GameStatus::PLAYING; // 낼 수 없는 카드
 }
 
-void CGameLogic::DrawCard()
+GameStatus CGameLogic::DrawCard()
 {
-	if (m_deck.empty()) return; // 덱이 비었으면 아무것도 안 함
-	if (!m_isPlayerTurn) return; // 플레이어 턴이 아니면 안 됨
-	// 1. 덱에서 카드 한 장 뽑기
+	if (m_deck.empty() || !m_isPlayerTurn) return GameStatus::PLAYING;
+
 	m_playerHand.push_back(m_deck.back());
 	m_deck.pop_back();
-	m_isPlayerTurn = false; // 턴 종료
+	m_isPlayerTurn = false;
+	return CheckGameOver();
 }
 
-void CGameLogic::ComTurn()
+GameStatus CGameLogic::ComTurn()
 {
-	if (m_isPlayerTurn) return; // 컴퓨터 턴이 아님
+	if (m_isPlayerTurn) return GameStatus::PLAYING; // 컴퓨터 턴이 아님
 	const Card& topCard = m_openPile.back();
 	// 1. 낼 수 있는 카드 찾기
 	auto it = std::find_if(m_comHand.begin(), m_comHand.end(), [&](const Card& card) {
@@ -123,6 +122,7 @@ void CGameLogic::ComTurn()
 		}
 	}
 	m_isPlayerTurn = true; // 플레이어 턴으로 변경
+	return CheckGameOver();
 }
 
 const std::vector<Card>& CGameLogic::GetPlayerHand() const
@@ -143,4 +143,22 @@ Card CGameLogic::GetOpenCard() const
 	}
 	// 실패 시 기본값 또는 에러를 나타내는 카드 반환
 	return Card{ CardSuit::ERR, -1, -1 };
+}
+
+bool CGameLogic::IsPlayerTurn() const
+{
+	return m_isPlayerTurn;
+}
+
+GameStatus CGameLogic::CheckGameOver()
+{
+	if (m_playerHand.empty() || m_comHand.size() >= 20)
+	{
+		return GameStatus::PLAYER_WIN;
+	}
+	if (m_comHand.empty() || m_playerHand.size() >= 20)
+	{
+		return GameStatus::PLAYER_LOSE;
+	}
+	return GameStatus::PLAYING; // 게임이 끝나지 않았으면 PLAYING 반환
 }

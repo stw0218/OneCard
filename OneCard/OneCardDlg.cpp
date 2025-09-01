@@ -34,6 +34,9 @@ BEGIN_MESSAGE_MAP(COneCardDlg, CDialogEx)
 	ON_BN_CLICKED(IDOK, &COneCardDlg::OnBnClickedOk)
 	ON_BN_CLICKED(IDCANCEL, &COneCardDlg::OnBnClickedCancel)
     ON_WM_SIZE()
+    ON_WM_LBUTTONDOWN()
+    ON_WM_TIMER()
+    ON_WM_ERASEBKGND()
 END_MESSAGE_MAP()
 
 
@@ -52,59 +55,79 @@ void COneCardDlg::OnPaint()
 {
     CPaintDC dc(this);
 
-    // 1. 배경 그리기
     CRect rect;
     GetClientRect(&rect);
-    dc.FillSolidRect(rect, RGB(0, 80, 0));
 
-    // OnSize에서 미리 계산해 둔 위치 정보를 사용합니다.
-    // 2. 카드 덱(Deck) 더미 그리기
-    DrawCard(&dc, IDB_CARD_BACK, m_deckRect);
+    // 1. 메모리 DC와 메모리 비트맵을 생성합니다. (보이지 않는 스케치북)
+    CDC memDC;
+    memDC.CreateCompatibleDC(&dc);
 
-    // 3. 공개된 카드(Open Pile) 그리기
-    //    GetOpenCard는 실패할 수 있으므로 방어 코드를 추가합니다.
+    CBitmap memBitmap;
+    memBitmap.CreateCompatibleBitmap(&dc, rect.Width(), rect.Height());
+
+    // 2. 메모리 DC에 비트맵을 선택하여 그릴 준비를 합니다.
+    CBitmap* pOldBmp = memDC.SelectObject(&memBitmap);
+
+    // ===================================================================
+    // ★★★ 모든 그리기 코드는 이제 'dc'가 아닌 'memDC'에 그려야 합니다. ★★★
+    // ===================================================================
+
+    // 1. 배경 그리기 (memDC에 그립니다)
+    memDC.FillSolidRect(rect, RGB(0, 80, 0));
+
+    // 2. 덱, 공개된 카드 그리기 (memDC에 그립니다)
+    DrawCard(&memDC, IDB_CARD_BACK, m_deckRect);
     Card openCard = m_game.GetOpenCard();
-    if (openCard.resourceID != -1) // 유효한 카드일 경우에만 그립니다.
+    if (openCard.resourceID != -1)
     {
-        DrawCard(&dc, openCard.resourceID, m_openCardRect);
+        DrawCard(&memDC, openCard.resourceID, m_openCardRect);
     }
 
-    // --- 4. 상대방(컴퓨터) 패 그리기 ---
+    // 3. 컴퓨터 패 그리기 (memDC에 그립니다)
     const auto& comCards = m_game.GetComHand();
     if (!comCards.empty())
     {
-        // 컴퓨터 패의 위치를 그릴 때마다 계산합니다.
         int comCardCount = comCards.size();
-        int overlap = m_cardSize.cx / 4;
+        int overlap = m_cardSize.cx * OVERLAP_CARD_RATIO;
         int margin = rect.Width() / 50;
 
         for (int i = 0; i < comCardCount; ++i)
         {
             CRect cardRect(0, 0, m_cardSize.cx, m_cardSize.cy);
-            // m_openCardRect 오른쪽에 배치합니다.
             cardRect.OffsetRect(m_openCardRect.right + margin + i * overlap, margin);
-            DrawCard(&dc, IDB_CARD_BACK, cardRect); // 컴퓨터 카드는 뒷면으로 그립니다.
+            DrawCard(&memDC, IDB_CARD_BACK, cardRect);
         }
     }
 
-    // --- 5. 내(플레이어) 패 그리기 ---
+    // 4. 플레이어 패 그리기 (memDC에 그립니다)
     const auto& myCards = m_game.GetPlayerHand();
     if (!myCards.empty())
     {
-        // 플레이어 패의 위치를 그릴 때마다 계산합니다.
         int myCardCount = myCards.size();
-        int overlap = m_cardSize.cx / 4;
+        int overlap = m_cardSize.cx * OVERLAP_CARD_RATIO;
         int totalHandWidth = (myCardCount - 1) * overlap + m_cardSize.cx;
-        int startX = (rect.Width() - totalHandWidth) / 2; // 중앙 정렬
+        int startX = (rect.Width() - totalHandWidth) / 2;
         int margin = rect.Width() / 50;
 
         for (int i = 0; i < myCardCount; ++i)
         {
             CRect cardRect(0, 0, m_cardSize.cx, m_cardSize.cy);
             cardRect.OffsetRect(startX + i * overlap, rect.Height() - m_cardSize.cy - margin);
-            DrawCard(&dc, myCards[i].resourceID, cardRect);
+            DrawCard(&memDC, myCards[i].resourceID, cardRect);
         }
     }
+
+    // ===================================================================
+    // ★★★ 모든 그리기가 끝났습니다. ★★★
+    // ===================================================================
+
+    // 3. 메모리 DC에 완성된 그림을 실제 화면 DC로 한 번에 복사합니다.
+    dc.BitBlt(0, 0, rect.Width(), rect.Height(), &memDC, 0, 0, SRCCOPY);
+
+    // 4. 사용이 끝난 GDI 객체들을 정리합니다.
+    memDC.SelectObject(pOldBmp);
+    memBitmap.DeleteObject();
+    memDC.DeleteDC();
 }
 
 void COneCardDlg::DrawCard(CDC* pDC, int resourceID, CRect destRect)
@@ -229,4 +252,147 @@ void COneCardDlg::OnSize(UINT nType, int cx, int cy)
 
     // 5. 모든 계산이 끝났으므로 화면을 갱신하라고 윈도우에 알림
     Invalidate();
+}
+
+void COneCardDlg::OnLButtonDown(UINT nFlags, CPoint point)
+{
+    // 1. 플레이어 턴이 아니면 아무런 행동도 하지 않음
+    if (!m_game.IsPlayerTurn())
+    {
+        CDialogEx::OnLButtonDown(nFlags, point);
+        return;
+    }
+
+    GameStatus status = GameStatus::PLAYING; // 턴의 결과를 저장할 변수
+
+    // 2. 플레이어의 카드를 클릭했는지 먼저 확인
+    int clickedCardIndex = GetClickedCardIndex(point);
+    if (clickedCardIndex != -1)
+    {
+        // 2-1. 카드를 클릭했다면, 카드 내는 로직 실행
+        status = m_game.PlayCard(clickedCardIndex);
+    }
+    // 3. 카드를 클릭하지 않았다면, 덱을 클릭했는지 확인
+    else if (m_deckRect.PtInRect(point))
+    {
+        // 3-1. 덱을 클릭했다면, 카드 뽑는 로직 실행
+        status = m_game.DrawCard();
+    }
+
+    // 4. 어떤 행동이라도 했다면 (상태가 바뀌었다면) 화면 갱신 및 후속 처리
+    if (status != GameStatus::PLAYING || clickedCardIndex != -1 || m_deckRect.PtInRect(point))
+    {
+        Invalidate(); // 화면을 다시 그림
+
+        // 게임 오버 상태인지 확인하고 처리
+        ProcessGameStatus(status);
+
+        // 게임이 계속되고, 턴이 컴퓨터에게 넘어갔다면 컴퓨터 턴 타이머 설정
+        if (status != GameStatus::PLAYER_WIN && status != GameStatus::PLAYER_LOSE && !m_game.IsPlayerTurn())
+        {
+            SetTimer(TIMER_COM_TURN, 1000, NULL);
+        }
+    }
+
+    CDialogEx::OnLButtonDown(nFlags, point);
+}
+
+void COneCardDlg::OnTimer(UINT_PTR nIDEvent)
+{
+    if (nIDEvent == TIMER_COM_TURN)
+    {
+        // 1. 타이머를 즉시 종료하여 반복적으로 실행되는 것을 막습니다. (매우 중요)
+        KillTimer(TIMER_COM_TURN);
+
+        // 2. 컴퓨터의 턴 로직을 실행합니다.
+        m_game.ComTurn();
+
+        // 3. 컴퓨터가 행동한 결과를 화면에 그리도록 갱신을 요청합니다.
+        Invalidate();
+    }
+
+    CDialogEx::OnTimer(nIDEvent);
+}
+
+void COneCardDlg::ProcessGameStatus(GameStatus status)
+{
+    CString message;
+    bool bGameOver = false;
+
+    switch (status)
+    {
+    case GameStatus::PLAYER_WIN:
+        message = _T("승리했습니다! 새 게임을 시작합니다.");
+        bGameOver = true;
+        break;
+    case GameStatus::PLAYER_LOSE:
+        message = _T("패배했습니다. 새 게임을 시작합니다.");
+        bGameOver = true;
+        break;
+    case GameStatus::PLAYING:
+        // 게임이 진행 중이면 아무것도 하지 않음
+        break;
+    }
+
+    if (bGameOver)
+    {
+        AfxMessageBox(message);
+        m_game.StartGame(); // 게임 로직 초기화
+        Invalidate();       // 화면을 완전히 새로 그림
+    }
+}
+
+// 마우스 클릭 좌표를 기반으로 플레이어의 몇 번째 카드가 클릭되었는지 반환하는 함수
+// 클릭된 카드가 없으면 -1을 반환
+int COneCardDlg::GetClickedCardIndex(CPoint point)
+{
+    const auto& myCards = m_game.GetPlayerHand();
+    if (myCards.empty()) return -1;
+
+    // --- OnPaint와 동일한 카드 위치 계산 로직 ---
+    CRect clientRect;
+    GetClientRect(&clientRect);
+
+    CSize cardSize;
+    cardSize.cy = clientRect.Height() / 4;
+    cardSize.cx = static_cast<int>(cardSize.cy * 0.714);
+
+    int overlap = cardSize.cx / 4;
+    int myCardCount = myCards.size();
+    int totalHandWidth = (myCardCount - 1) * overlap + cardSize.cx;
+    int startX = (clientRect.Width() - totalHandWidth) / 2;
+    int margin = clientRect.Width() / 50;
+    // --- 계산 로직 끝 ---
+
+    // ★★★ 중요: 맨 위에 그려진 카드(오른쪽 카드)부터 역순으로 검사해야 합니다. ★★★
+    for (int i = myCardCount - 1; i >= 0; --i)
+    {
+        CRect cardRect(0, 0, cardSize.cx, cardSize.cy);
+        cardRect.OffsetRect(startX + i * overlap, clientRect.Height() - cardSize.cy - margin);
+
+        // 마지막 카드(맨 오른쪽)는 전체 영역을 검사합니다.
+        if (i == myCardCount - 1)
+        {
+            if (cardRect.PtInRect(point))
+            {
+                return i; // i번째 카드 클릭됨
+            }
+        }
+        else // 겹쳐진 카드들은 보이는 부분(왼쪽 overlap 만큼)만 검사합니다.
+        {
+            CRect visibleRect = cardRect;
+            visibleRect.right = visibleRect.left + overlap; // 보이는 영역만 사각형으로 만듦
+            if (visibleRect.PtInRect(point))
+            {
+                return i; // i번째 카드 클릭됨
+            }
+        }
+    }
+
+    return -1; // 아무 카드도 클릭되지 않음
+}
+BOOL COneCardDlg::OnEraseBkgnd(CDC* pDC)
+{
+    //return CDialogEx::OnEraseBkgnd(pDC);
+    return TRUE;
 }
