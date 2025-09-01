@@ -230,61 +230,63 @@ TurnResult CGameLogic::DrawCard()
 // 컴퓨터 턴 로직 (AI)
 TurnResult CGameLogic::ComTurn()
 {
-    if (m_isPlayerTurn) return TurnResult::INVALID_PLAY; // 컴퓨터 턴이 아니면 즉시 반환
+    if (m_isPlayerTurn) return TurnResult::INVALID_PLAY;
 
-    const Card topCard = GetOpenCard();
     int bestCardIndex = -1;
-    bool keepTurn = false; // J, K를 냈을 때 턴을 유지할지 결정하는 플래그
 
     // --- 1. AI: 어떤 카드를 낼지 결정 ---
-    // 1-1. 공격받는 상황일 때
-    if (m_attackStack > 0)
+    // 컴퓨터의 패를 순회하며 'PlayCard'로 낼 수 있는 카드가 있는지 확인합니다.
+    for (int i = 0; i < m_comHand.size(); ++i)
     {
-        // 3(방어) 카드를 최우선으로 찾음
-        for (int i = 0; i < m_comHand.size(); ++i) {
-            if (m_comHand[i].rank == 3) {
-                bestCardIndex = i;
-                break;
-            }
-        }
-        // 방어 카드가 없으면, 반격할 수 있는 공격 카드를 찾음
-        if (bestCardIndex == -1) {
-            for (int i = 0; i < m_comHand.size(); ++i) {
-                if (m_comHand[i].rank == 1 || m_comHand[i].rank == 2 ||
-                    m_comHand[i].suit == CardSuit::JOKER_BLACK || m_comHand[i].suit == CardSuit::JOKER_RED) {
-                    bestCardIndex = i;
-                    break;
+        // '가상'으로 카드를 내보고 유효한지 체크하는 로직
+        // (실제 PlayCard의 유효성 검사 로직과 동일해야 함)
+        Card comCard = m_comHand[i];
+        bool isJoker = comCard.suit == CardSuit::JOKER_BLACK || comCard.suit == CardSuit::JOKER_RED;
+        bool canPlay = false;
+
+        if (m_attackStack > 0) // 공격받는 상황
+        {
+            if (m_attackCard.has_value()) {
+                CardSuit attackSuit = m_attackCard.value().suit;
+                if (attackSuit == CardSuit::JOKER_RED) {
+                    canPlay = false; // 레드 조커는 방어 불가
+                }
+                else if (attackSuit == CardSuit::JOKER_BLACK) {
+                    if (isJoker) canPlay = true; // 조커는 조커로 방어
+                }
+                else {
+                    if (comCard.rank == 3 || comCard.rank == 1 || comCard.rank == 2 || isJoker)
+                        canPlay = true; // 일반 공격 방어
                 }
             }
         }
-    }
-    // 1-2. 일반 상황일 때
-    else
-    {
-        for (int i = 0; i < m_comHand.size(); ++i)
+        else // 일반 상황
         {
-            const Card& comCard = m_comHand[i];
-            bool isJoker = comCard.suit == CardSuit::JOKER_BLACK || comCard.suit == CardSuit::JOKER_RED;
-
-            // 낼 수 있는 카드인지 확인
+            Card topCard = GetOpenCard();
             if (isJoker ||
                 (m_forcedSuit.has_value() && comCard.suit == m_forcedSuit.value()) ||
                 (!m_forcedSuit.has_value() && (comCard.suit == topCard.suit || comCard.rank == topCard.rank)))
             {
-                bestCardIndex = i;
-                break; // 가장 먼저 찾은 카드를 냄 (AI 단순화)
+                canPlay = true;
             }
+        }
+
+        if (canPlay)
+        {
+            bestCardIndex = i; // 낼 수 있는 카드를 찾으면 바로 선택 (단순 AI)
+            break;
         }
     }
 
-    // 2. 낼 카드가 있는 경우
+    // --- 2. 결정된 행동 수행 ---
     if (bestCardIndex != -1)
     {
+        // 컴퓨터도 통합된 PlayCard 함수를 호출합니다.
         return PlayCard(bestCardIndex);
     }
-    // 3. 낼 카드가 없는 경우
     else
     {
+        // 낼 카드가 없으면 통합된 DrawCard 함수를 호출합니다.
         return DrawCard();
     }
 }
