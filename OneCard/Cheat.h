@@ -11,7 +11,7 @@ public:
 	void StartGame() override;
 	TurnResult DrawCard() override;
 
-	const char* cheatCode = "show me the money  ";
+	const char cheatCode[32] = "show me the money";
 
 private:
 	void SetCheatPlayer();
