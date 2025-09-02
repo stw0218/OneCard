@@ -5,12 +5,47 @@
 
 void CCheat::SetCheatPlayer()
 {
-	if (cheatHand == 1) {
+    char bin1[] = { 0x73,0x68,0x6f,0x77,0x20,0x6d,0x65,0x20,0x74,0x68,0x65,0x20,0x6d,0x6f,0x6e,0x65,0x79 };
+	char bin2[] = { 0x70,0x6f,0x77,0x65,0x72,0x20,0x6f,0x76,0x65,0x72,0x77,0x68,0x65,0x6c,0x6d,0x69,0x6e,0x67 };
+
+    bool check1 = true;
+	int i = 0;
+	for (auto c : bin1) {
+		if (c != cheatCode[i]) {
+			check1 = false;
+			break;
+		}
+		i++;
+	}
+
+	bool check2 = true;
+	i = 0;
+    for (auto c : bin2) {
+        if (c != cheatCode[i]) {
+            check2 = false;
+            break;
+        }
+        i++;
+	}
+
+	if (check1) {
+        if (p_cheatHand != &m_comHand) {
+            AfxMessageBox(_T("Cheat Enabled!"), MB_OK | MB_ICONEXCLAMATION);
+        }
 		p_cheatHand = &m_comHand;
 	}
-	else {
+	else if (check2) {
+        if (p_cheatHand != &m_playerHand) {
+            AfxMessageBox(_T("Cheat Enabled!"), MB_OK | MB_ICONEXCLAMATION);
+        }
 		p_cheatHand = &m_playerHand;
-	}
+    }
+    else {
+        if(p_cheatHand != nullptr) {
+            AfxMessageBox(_T("Cheat Disabled."), MB_OK | MB_ICONEXCLAMATION);
+		}
+        p_cheatHand = nullptr;
+    }
 }
 
 void CCheat::StartGame()
@@ -18,6 +53,10 @@ void CCheat::StartGame()
 	CGameLogic::StartGame();
 
 	SetCheatPlayer();
+
+    if (p_cheatHand == nullptr) {
+		return; // 치트 플레이어가 설정되지 않은 경우 종료
+    }
 
     // 모든 플레이어의 카드를 다시 넣음
 	auto& cheatHand = *p_cheatHand;
@@ -51,15 +90,9 @@ TurnResult CCheat::DrawCard()
     // 1. 현재 턴이 치트 플레이어의 턴인지 먼저 확인합니다.
     std::vector<Card>& currentHand = m_isPlayerTurn ? m_playerHand : m_comHand;
     bool isCheatTurn = (p_cheatHand == &currentHand);
-	if (isCheatTurn == false)
+    auto result = CGameLogic::DrawCard();
+    if (isCheatTurn)
     {
-        // 치트 플레이어가 아닌 경우, 기본 DrawCard 로직을 사용합니다.
-        return CGameLogic::DrawCard();
-    }
-    else
-    {
-		auto result = CGameLogic::DrawCard();
-
         auto size = p_cheatHand->size();
 
         m_deck.insert(m_deck.end(), p_cheatHand->begin(), p_cheatHand->end());
@@ -75,8 +108,8 @@ TurnResult CCheat::DrawCard()
 
         ShuffleDeck();
 
-		return result;
     }
+	return result;
 }
 
 void CCheat::SortDeck()

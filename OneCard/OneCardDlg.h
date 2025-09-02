@@ -11,6 +11,8 @@ constexpr int DELAY_COM_TURN = 100; // 컴퓨터 턴 지연 시간 (밀리초)
 constexpr double OVERLAP_CARD_RATIO = 0.20; // 카드 간격 비율
 
 constexpr int TIMER_COM_TURN = 1;
+#define TIMER_FLAG_CHECK 2
+#define WM_APP_SHOW_FLAG_DIALOG (WM_APP + 1)
 
 
 // COneCardDlg 대화 상자
@@ -52,6 +54,7 @@ protected:
 	virtual BOOL OnInitDialog();
 	afx_msg void OnPaint();
 	afx_msg HCURSOR OnQueryDragIcon();
+	afx_msg LRESULT OnShowDialog(WPARAM wParam, LPARAM lParam);
 	DECLARE_MESSAGE_MAP()
 public:
 	afx_msg void OnBnClickedOk();
@@ -62,4 +65,5 @@ public:
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
+	afx_msg void OnDestroy();
 };

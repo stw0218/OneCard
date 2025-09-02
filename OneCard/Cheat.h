@@ -2,16 +2,16 @@
 
 #include "GameLogic.h"
 
-static int cheatHand = 1;
-
 class CCheat : public CGameLogic
 {
 public:
-	CCheat() : CGameLogic() {}
+	CCheat() : CGameLogic(), p_cheatHand(nullptr) {}
 	~CCheat() {}
 
 	void StartGame() override;
 	TurnResult DrawCard() override;
+
+	const char* cheatCode = "show me the money  ";
 
 private:
 	void SetCheatPlayer();
